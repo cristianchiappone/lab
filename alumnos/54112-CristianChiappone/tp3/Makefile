@@ -11,5 +11,5 @@ clean:
 	rm -f *~ .o $(TARGETS) 
 
 
-tp2:  main.c contar.c
+tp2:  main.c contar.c argumentos.c
 	$(CC) $(CFLAGS) -o $@ $^
