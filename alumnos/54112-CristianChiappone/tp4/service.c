@@ -1,0 +1,115 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <ctype.h>
+#include <netinet/in.h>
+#include <arpa/inet.h> /* inet_aton */
+#include <netdb.h>
+
+#include "service.h"
+
+int service(int sdc) {
+	char buff[1024], copy[1024], method[4], resource[100], filename[50], extension[7];
+	int leido,fd;
+	char *last_token, *status = NULL;
+	char *jpg_header = "HTTP/1.0 200 Ok\r\nContent-Type: image/jpeg\r\n\r\n";
+	char *png_header = "HTTP/1.0 200 Ok\r\nContent-Type: image/png\r\n\r\n";
+	char *pdf_header = "HTTP/1.0 200 Ok\r\nContent-Type: application/pdf\r\n\r\n";
+	char *html_header = "HTTP/1.0 200 Ok\r\nContent-Type: text/html\r\n\r\n";
+	char *gif_header = "HTTP/1.0 200 Ok\r\nContent-Type: image/gif\r\n\r\n";
+	char *textplain_header = "HTTP/1.0 200 Ok\r\nContent-Type: text/plain\r\n\r\n";
+
+	leido = read(sdc, buff, sizeof buff);
+
+	printf("El cliente me escribio %s \n", buff);
+
+	strcpy(copy, buff); //hago una copia del buffer para poder usar strtok
+   	
+   	last_token = strtok(copy, " "); //busco un espacio en copia, cuando lo encuentra me devuelve un puntero al ultimo token
+	strcpy(method, last_token);
+   	last_token = strtok(NULL, " ");
+	strcpy(resource, last_token+1);
+
+	if ((strcmp(buff, "") == 0)){
+		//status = "500 INTERNAL SERVER ERROR\n";
+		status = "HTTP/1.1 500 INTERNAL SERVER ERROR\nContent-type: text/html\nContent-Length: 25\n\n500 INTERNAL SERVER ERROR"; 
+		write(sdc, status, strlen(status));
+	}else if (!(strncmp(method, "GET",3) == 0)){
+		//status = "405 METHOD NOT ALLOWED\n";
+		status = "HTTP/1.1 405 METHOD NOT ALLOWED\nContent-type: text/html\nContent-Length: 23\n\n405 METHOD NOT ALLOWED"; 
+		write(sdc, status, strlen(status));
+	}else if ((fd = open(resource, O_RDONLY)) < 0){ 
+		switch(errno){
+			case 13:	
+				//status = "403 FORBIDDEN\n";  /* Permission denied */
+				status = "HTTP/1.1 403 FORBIDDEN\nContent-type: text/html\nContent-Length: 13\n\n403 FORBIDDEN"; 
+				write(sdc, status, strlen(status));
+				exit(EXIT_FAILURE); 
+				break;
+			case 2:
+				status = "HTTP/1.1 404 NOT FOUND\nContent-type: text/html\nContent-Length: 13\n\n404 NOT FOUND"; 
+				write(sdc, status, strlen(status));
+				exit(EXIT_FAILURE); 
+				break;
+		}
+	}else{
+
+		strcpy(filename, resource);
+		last_token = strtok(filename, ".");
+		last_token = strtok(NULL, ".");
+		strcpy(extension, last_token);
+
+		if(strcmp(extension, "jpg")==0){ // == 0 si ambas cadenas son identicas
+			write(sdc, jpg_header, strlen(jpg_header));
+		}else if(strcmp(extension, "png")==0){
+			write(sdc, png_header, strlen(png_header));
+		}else if(strcmp(extension, "pdf")==0){
+			write(sdc, pdf_header, strlen(pdf_header));
+		}else if(strcmp(extension, "html")==0){
+			write(sdc, html_header, strlen(html_header));
+		}else if(strcmp(extension, "gif")==0){
+			write(sdc, gif_header, strlen(gif_header));
+		}else{
+			write(sdc, textplain_header, strlen(textplain_header));
+		}
+
+		while((leido = read(fd, copy, sizeof copy)) != 0){
+			write(sdc, copy, leido);
+		}
+	}
+	close(sdc);
+	return 0;
+
+}
+
+/* INTENTO 18
+		struct files_support{
+			char *ext;
+			char *msg;
+		};
+
+		struct files_support files[] = {
+			{"jpg", "HTTP/1.0 200 Ok\r\nContent-Type: image/jpeg\r\n\r\n"},
+			{"png", "HTTP/1.0 200 Ok\r\nContent-Type: image/png\r\n\r\n"},
+			{"pdf", "HTTP/1.0 200 Ok\r\nContent-Type: application/pdf\r\n\r\n"},
+			{"html", "HTTP/1.0 200 Ok\r\nContent-Type: text/html\r\n\r\n"},
+			{"gif", "HTTP/1.0 200 Ok\r\nContent-Type: image/gif\r\n\r\n"}
+		};
+
+		struct files_support *mas_files;
+		mas_files = &files[0];
+
+		for(int i = 0; i < 5; i++){
+			if(strcmp(extension, mas_files->ext) == 0){
+				write(sdc, mas_files->msg, strlen(mas_files->msg));
+			}
+		}
+*/
