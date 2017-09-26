@@ -1,5 +1,5 @@
-#ifndef _arg_h_
-#define _arg_h_
+#ifndef _ARG_h_
+#define _ARG_h_
 
 #include <getopt.h>
 

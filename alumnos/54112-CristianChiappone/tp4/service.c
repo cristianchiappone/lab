@@ -19,13 +19,17 @@
 int service(int sdc) {
 	char buff[1024], copy[1024], method[4], resource[100], filename[50], extension[7];
 	int leido,fd;
-	char *last_token, *status = NULL;
+	char *last_token;
 	char *jpg_header = "HTTP/1.0 200 Ok\r\nContent-Type: image/jpeg\r\n\r\n";
 	char *png_header = "HTTP/1.0 200 Ok\r\nContent-Type: image/png\r\n\r\n";
 	char *pdf_header = "HTTP/1.0 200 Ok\r\nContent-Type: application/pdf\r\n\r\n";
 	char *html_header = "HTTP/1.0 200 Ok\r\nContent-Type: text/html\r\n\r\n";
 	char *gif_header = "HTTP/1.0 200 Ok\r\nContent-Type: image/gif\r\n\r\n";
 	char *textplain_header = "HTTP/1.0 200 Ok\r\nContent-Type: text/plain\r\n\r\n";
+	char *err_404 = "HTTP/1.1 404 NOT FOUND\nContent-type: text/html\nContent-Length: 13\n\n404 NOT FOUND";
+	char *err_403 =  "HTTP/1.1 403 FORBIDDEN\nContent-type: text/html\nContent-Length: 13\n\n403 FORBIDDEN"; 
+	char *err_405 = "HTTP/1.1 405 METHOD NOT ALLOWED\nContent-type: text/html\nContent-Length: 23\n\n405 METHOD NOT ALLOWED"; 
+	char *err_500 = "HTTP/1.1 500 INTERNAL SERVER ERROR\nContent-type: text/html\nContent-Length: 25\n\n500 INTERNAL SERVER ERROR"; 
 
 	leido = read(sdc, buff, sizeof buff);
 
@@ -39,24 +43,17 @@ int service(int sdc) {
 	strcpy(resource, last_token+1);
 
 	if ((strcmp(buff, "") == 0)){
-		//status = "500 INTERNAL SERVER ERROR\n";
-		status = "HTTP/1.1 500 INTERNAL SERVER ERROR\nContent-type: text/html\nContent-Length: 25\n\n500 INTERNAL SERVER ERROR"; 
-		write(sdc, status, strlen(status));
+		write(sdc, err_500, strlen(err_500));
 	}else if (!(strncmp(method, "GET",3) == 0)){
-		//status = "405 METHOD NOT ALLOWED\n";
-		status = "HTTP/1.1 405 METHOD NOT ALLOWED\nContent-type: text/html\nContent-Length: 23\n\n405 METHOD NOT ALLOWED"; 
-		write(sdc, status, strlen(status));
+		write(sdc, err_405, strlen(err_405));
 	}else if ((fd = open(resource, O_RDONLY)) < 0){ 
 		switch(errno){
 			case 13:	
-				//status = "403 FORBIDDEN\n";  /* Permission denied */
-				status = "HTTP/1.1 403 FORBIDDEN\nContent-type: text/html\nContent-Length: 13\n\n403 FORBIDDEN"; 
-				write(sdc, status, strlen(status));
+				write(sdc, err_403, strlen(err_403));
 				exit(EXIT_FAILURE); 
 				break;
 			case 2:
-				status = "HTTP/1.1 404 NOT FOUND\nContent-type: text/html\nContent-Length: 13\n\n404 NOT FOUND"; 
-				write(sdc, status, strlen(status));
+				write(sdc, err_404, strlen(err_404));
 				exit(EXIT_FAILURE); 
 				break;
 		}
@@ -87,29 +84,4 @@ int service(int sdc) {
 	}
 	close(sdc);
 	return 0;
-
 }
-
-/* INTENTO 18
-		struct files_support{
-			char *ext;
-			char *msg;
-		};
-
-		struct files_support files[] = {
-			{"jpg", "HTTP/1.0 200 Ok\r\nContent-Type: image/jpeg\r\n\r\n"},
-			{"png", "HTTP/1.0 200 Ok\r\nContent-Type: image/png\r\n\r\n"},
-			{"pdf", "HTTP/1.0 200 Ok\r\nContent-Type: application/pdf\r\n\r\n"},
-			{"html", "HTTP/1.0 200 Ok\r\nContent-Type: text/html\r\n\r\n"},
-			{"gif", "HTTP/1.0 200 Ok\r\nContent-Type: image/gif\r\n\r\n"}
-		};
-
-		struct files_support *mas_files;
-		mas_files = &files[0];
-
-		for(int i = 0; i < 5; i++){
-			if(strcmp(extension, mas_files->ext) == 0){
-				write(sdc, mas_files->msg, strlen(mas_files->msg));
-			}
-		}
-*/
